@@ -79,7 +79,7 @@
       1: { id: 1, name: "幼熊(ヨウシオン)", emoji: "🧸", reqExp: 0, next: [2] },
       2: { id: 2, name: "熊兄(シォンシォン)", emoji: "🐻", reqExp: 3, next: [3, 4] },
       3: { id: 3, name: "熊飛燕(シォンフェイイェン)", emoji: "🥋", reqExp: 8, next: [5, 6] },
-      4: { id: 4, name: "熊太極(シォンタイジー)", emoji: "☯️️", reqExp: 8, next: [7, 8] },
+      4: { id: 4, name: "熊太極(シォンタイジー)", emoji: "☯", reqExp: 8, next: [7, 8] },
       5: { id: 5, name: "熊麗華(シォンリーホワ)", emoji: "🌸", reqExp: 15, next: [9, 10] },
       6: { id: 6, name: "熊雷神(シォンレイシェン)", emoji: "⚡", reqExp: 15, next: [11, 12] },
       7: { id: 7, name: "熊武神(シォンウーシェン)", emoji: "🔱", reqExp: 15, next: [13, 14] },
@@ -144,12 +144,6 @@
       { type: 'topic', label: '一番の思い出', prefix: 'My best memory is ', suffix: '.', action: '', example: '運動会' },
       { type: 'action', label: 'したこと・楽しんだこと', prefix: 'I ', verb: 'enjoyed', suffix: '.', action: '', example: 'ダンス' },
       { type: 'feeling', label: '感想', prefix: 'It was ', suffix: '.', action: '', example: 'fun' }
-    ];
-
-    const NOTE_QUESTIONS = [
-      "What is your best memory?",
-      "What did you do?",
-      "How was it?"
     ];
 
     const CoinGame = ({ playerEmoji, helpers, onFinish }) => {
@@ -509,7 +503,6 @@
       const handleTranslateSingle = async (idx) => {
         const inp = inputs[idx];
         
-        // Feeling type doesn't need external translation
         if (inp.type === 'feeling') {
           if (!inp.action) {
             alert("感想をえらんでね！");
@@ -694,106 +687,6 @@
         }
       };
 
-      const initQuiz = () => {
-        const ALL_WORDS = Object.keys(MEMORY_DIC).map(jp => ({ jp, en: MEMORY_DIC[jp] }));
-        const shuffled = [...ALL_WORDS].sort(() => 0.5 - Math.random());
-        const maxQuestions = Math.min(10, shuffled.length);
-        const selected = shuffled.slice(0, maxQuestions);
-        
-        const questions = selected.map((q, index) => {
-          const others = ALL_WORDS.filter(w => w.en !== q.en).sort(() => 0.5 - Math.random()).slice(0, 3);
-          const options = [q, ...others].sort(() => 0.5 - Math.random());
-          
-          if (index < Math.floor(maxQuestions / 2)) {
-            return { ...q, type: 'choice', options };
-          } else {
-            return { ...q, type: 'voice', options };
-          }
-        });
-        setQuizList(questions);
-        setCurrentQuizIndex(0);
-        setQuizScore(0);
-        setQuizStatus('question');
-        setFailCount(0);
-      };
-
-      const handleQuizCorrect = () => {
-        setQuizScore(s => s + 1);
-        setQuizStatus('correct');
-        const currentQ = quizList[currentQuizIndex];
-        speak(currentQ.en);
-        setTimeout(() => {
-          if (currentQuizIndex < quizList.length - 1) {
-            setCurrentQuizIndex(idx => idx + 1);
-            setQuizStatus('question');
-            setFeedbackMsg("");
-            setFailCount(0);
-          } else {
-            setQuizStatus('result');
-          }
-        }, 2000);
-      };
-
-      const handleQuizSkip = () => {
-        setQuizStatus('skipped');
-        const currentQ = quizList[currentQuizIndex];
-        speak(currentQ.en);
-        setTimeout(() => {
-          if (currentQuizIndex < quizList.length - 1) {
-            setCurrentQuizIndex(idx => idx + 1);
-            setQuizStatus('question');
-            setFeedbackMsg("");
-            setFailCount(0);
-          } else {
-            setQuizStatus('result');
-          }
-        }, 2000);
-      };
-
-      const startQuizListening = (targetEn) => {
-        if (!SpeechRecognition) {
-            alert("マイクが使えません。正解扱いで次に進みます。");
-            handleQuizCorrect();
-            return;
-        }
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'en-US';
-        setIsListening(true);
-        setFeedbackMsg("");
-
-        recognition.onresult = (event) => {
-          const trans = event.results[0][0].transcript.toLowerCase();
-          const cleanTransStr = trans.replace(/[^a-z]/g, '');
-          const cleanTargetStr = targetEn.toLowerCase().replace(/[^a-z]/g, '');
-          
-          let matchCount = 0;
-          const minLen = Math.min(cleanTransStr.length, cleanTargetStr.length);
-          const maxLen = Math.max(cleanTransStr.length, cleanTargetStr.length);
-          for(let i=0; i<minLen; i++){
-            if(cleanTransStr[i] === cleanTargetStr[i]) matchCount++;
-          }
-          const matchRate = maxLen > 0 ? (matchCount / maxLen) : 0;
-          
-          if (matchRate >= 0.8 || trans === targetEn.toLowerCase().replace(/[.]/g, '')) {
-             setFeedbackMsg("Excellent! 👏");
-             setIsListening(false);
-             setFailCount(0);
-             handleQuizCorrect();
-          } else {
-             setFailCount(c => c + 1);
-             setFeedbackMsg("おしい！もう一度！\n(" + trans + " と聞こえました)");
-             setIsListening(false);
-          }
-        };
-        recognition.onerror = () => { 
-            setFailCount(c => c + 1);
-            setFeedbackMsg("エラーがおきました。もう一度ボタンをおしてね。"); 
-            setIsListening(false); 
-        };
-        recognition.onend = () => setIsListening(false);
-        recognition.start();
-      };
-
       const BackButton = () => (
         <button onClick={goBack} className="absolute top-4 left-4 bg-white/90 px-4 py-2 rounded-full shadow font-bold text-gray-700 border hover:bg-gray-100 z-20">
           ◀ もどる
@@ -818,13 +711,6 @@
               if (!ans) return null;
               return (
                 <div key={idx} className={`mb-10 min-w-max ${isTeacherScreen ? 'border-b-2 border-gray-300 pb-6' : ''}`}>
-                  <div className={`text-gray-500 text-sm font-bold mb-1 inline-block px-2 rounded-t-lg relative z-10 ${isTeacherScreen ? '' : 'bg-white/80'}`}>質問 {idx + 1}</div>
-                  <div className={`${isTeacherScreen ? 'bg-gray-100 p-4 rounded-xl border border-gray-200' : 'four-lines-bg rounded-b-lg border-2 border-gray-200 shadow-sm'} flex min-w-max mb-4`}>
-                    <span className={`font-note font-bold flex items-baseline flex-nowrap gap-2 ${isTeacherScreen ? 'text-2xl py-2' : 'px-4'}`}>
-                      <span className="text-gray-800 shrink-0">{NOTE_QUESTIONS[idx]}</span>
-                    </span>
-                  </div>
-
                   <div className={`text-gray-500 text-sm font-bold mb-1 inline-block px-2 rounded-t-lg relative z-10 ${isTeacherScreen ? '' : 'bg-white/80'}`}>答え {idx + 1}: {ans.action}</div>
                   
                   {isTeacherScreen && (
@@ -941,15 +827,24 @@
                     <div className="bg-yellow-100 text-yellow-800 font-bold px-4 py-1 rounded-full border-2 border-yellow-300">🪙 {totalCoins} コイン / 🐟 シャケ: {items.salmon}</div>
                   </div>
                   
-                  <div className="flex justify-center gap-4 mb-4">
+                  <div className="flex justify-center gap-2 mb-4 w-full">
                      <button onClick={() => {
                        if (totalCoins >= 3) {
                          saveProgress(totalCoins - 3, { ...items, salmon: items.salmon + 1 }, kummaniLevel, kummaniExp);
                          setFeedEffect({ phase: 'buy_salmon', amount: 1 });
                          setTimeout(() => setFeedEffect(null), 2000);
                        }
-                     }} disabled={totalCoins < 3} className={`py-2 px-4 rounded-xl font-bold shadow text-sm transition flex-1 max-w-[150px] ${totalCoins >= 3 ? 'bg-teal-500 hover:bg-teal-600 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
+                     }} disabled={totalCoins < 3} className={`py-2 px-2 rounded-xl font-bold shadow text-sm transition flex-1 max-w-[150px] ${totalCoins >= 3 ? 'bg-teal-500 hover:bg-teal-600 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
                        🐟 1個買う<br/><span className="text-xs font-normal">(3コイン)</span>
+                     </button>
+                     <button onClick={() => {
+                       if (totalCoins >= 15) {
+                         saveProgress(totalCoins - 15, { ...items, salmon: items.salmon + 5 }, kummaniLevel, kummaniExp);
+                         setFeedEffect({ phase: 'buy_salmon', amount: 5 });
+                         setTimeout(() => setFeedEffect(null), 2000);
+                       }
+                     }} disabled={totalCoins < 15} className={`py-2 px-2 rounded-xl font-bold shadow text-sm transition flex-1 max-w-[150px] ${totalCoins >= 15 ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
+                       🐟 5個買う<br/><span className="text-xs font-normal">(15コイン)</span>
                      </button>
                      <button onClick={() => {
                        if (totalCoins >= 30) {
@@ -957,7 +852,7 @@
                          setFeedEffect({ phase: 'buy_salmon', amount: 10 });
                          setTimeout(() => setFeedEffect(null), 2000);
                        }
-                     }} disabled={totalCoins < 30} className={`py-2 px-4 rounded-xl font-bold shadow text-sm transition flex-1 max-w-[150px] ${totalCoins >= 30 ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
+                     }} disabled={totalCoins < 30} className={`py-2 px-2 rounded-xl font-bold shadow text-sm transition flex-1 max-w-[150px] ${totalCoins >= 30 ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
                        🐟 10個買う<br/><span className="text-xs font-normal">(30コイン)</span>
                      </button>
                   </div>
@@ -1110,7 +1005,6 @@
                     </div>
                   )}
 
-                  {/* Rendering Translation Status */}
                   {answers && answers[idx] && answers[idx].action === inp.action ? (
                     <div className="bg-teal-50 p-4 rounded-xl border-2 border-teal-200 mt-4 animate-fade-in-up">
                       <p className="text-sm text-teal-700 font-bold mb-1">✨ 文が できました！</p>
@@ -1264,7 +1158,7 @@
                   }
                 }} 
                 className={`w-full mt-8 text-white text-xl font-bold py-5 rounded-2xl shadow-lg transition transform ${canProceedToQuiz ? 'bg-blue-500 hover:bg-blue-600 hover:-translate-y-1' : 'bg-gray-400 cursor-not-allowed'}`}>
-                ぜんぶ がぞうを いれた！ ▶️
+                ぜんぶ がぞうを いれた！ ▶️️
               </button>
             </div>
           </div>
