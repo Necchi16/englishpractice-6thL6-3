@@ -401,6 +401,18 @@
       const [quizScore, setQuizScore] = useState(0);
       const [quizStatus, setQuizStatus] = useState('question');
 
+      const [slideVoiceCleared, setSlideVoiceCleared] = useState(false);
+      const [slideVoiceFailCount, setSlideVoiceFailCount] = useState(0);
+      const [isSlideListening, setIsSlideListening] = useState(false);
+      const [slideVoiceFeedback, setSlideVoiceFeedback] = useState("");
+
+      const resetSlideVoice = () => {
+        setSlideVoiceCleared(false);
+        setSlideVoiceFailCount(0);
+        setSlideVoiceFeedback("");
+        setIsSlideListening(false);
+      };
+
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const synth = window.speechSynthesis;
 
@@ -623,6 +635,51 @@
         recognition.start();
       };
 
+      const startSlideVoiceListening = (targetSentence) => {
+        if (!SpeechRecognition) {
+            alert("マイクが使えません。スキップして進んでください。");
+            setSlideVoiceCleared(true);
+            return;
+        }
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        setIsSlideListening(true);
+        setSlideVoiceFeedback("");
+
+        recognition.onresult = (event) => {
+          const trans = event.results[0][0].transcript.toLowerCase();
+          const cleanTransStr = trans.replace(/[^a-z]/g, '');
+          const cleanTargetStr = targetSentence.toLowerCase().replace(/[^a-z]/g, '');
+          
+          let matchCount = 0;
+          const minLen = Math.min(cleanTransStr.length, cleanTargetStr.length);
+          const maxLen = Math.max(cleanTransStr.length, cleanTargetStr.length);
+          
+          for(let i=0; i<minLen; i++){
+            if(cleanTransStr[i] === cleanTargetStr[i]) matchCount++;
+          }
+          const matchRate = maxLen > 0 ? (matchCount / maxLen) : 0;
+          
+          if (matchRate >= 0.8 || trans === targetSentence.toLowerCase().replace(/[.]/g, '')) {
+            setSlideVoiceFeedback("Excellent! 👏");
+            setSlideVoiceFailCount(0);
+            setTimeout(() => {
+              setSlideVoiceCleared(true);
+            }, 1000);
+          } else {
+            setSlideVoiceFailCount(c => c + 1);
+            setSlideVoiceFeedback("おしい！\n(" + trans + " と聞こえました)");
+          }
+        };
+        recognition.onerror = () => { 
+            setSlideVoiceFailCount(c => c + 1);
+            setSlideVoiceFeedback("エラーがおきました。もう一度ボタンをおしてね。"); 
+            setIsSlideListening(false); 
+        };
+        recognition.onend = () => setIsSlideListening(false);
+        recognition.start();
+      };
+
       const handleGameFinish = (coins) => {
         saveProgress(totalCoins + coins, items, kummaniLevel, kummaniExp);
         setStep('HOME');
@@ -802,7 +859,7 @@
                           <span className="text-sm font-bold text-gray-600">{work.date} の作品 ({savedWorks.length - idx})</span>
                           <div className="flex gap-2">
                             <button onClick={() => { setViewingWork(work); goToStep('VIEW_WORKSHEET'); }} className="text-sm bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-bold py-2 px-4 rounded shadow-sm border border-yellow-300">ノート</button>
-                            <button onClick={() => { setViewingWork(work); goToStep('VIEW_SLIDESHOW'); setCurrentSlideIndex(0); }} className="text-sm bg-teal-100 hover:bg-teal-200 text-teal-800 font-bold py-2 px-4 rounded shadow-sm border border-teal-300">スライド</button>
+                            <button onClick={() => { setViewingWork(work); goToStep('VIEW_SLIDESHOW'); setCurrentSlideIndex(0); resetSlideVoice(); }} className="text-sm bg-teal-100 hover:bg-teal-200 text-teal-800 font-bold py-2 px-4 rounded shadow-sm border border-teal-300">スライド</button>
                           </div>
                         </div>
                       ))}
@@ -1181,6 +1238,7 @@
               <button onClick={() => {
                 goToStep('VIEW_SLIDESHOW');
                 setCurrentSlideIndex(0);
+                resetSlideVoice();
               }} className="bg-blue-500 hover:bg-blue-600 text-white text-xl font-bold py-5 px-8 rounded-full flex items-center justify-center mx-auto shadow-md transform transition hover:scale-105 w-full">
                 🙋 近くの友だちに見せる！
               </button>
@@ -1208,6 +1266,7 @@
               <div className="w-full h-full max-h-[70vh] max-w-5xl slide-bg rounded-xl md:rounded-3xl shadow-[0_0_50px_rgba(255,255,255,0.2)] overflow-hidden relative flex flex-col border-4 border-gray-800">
                 {currentSlideIndex === workData.answers.length - 1 ? (
                   <button onClick={() => { 
+                    if (!slideVoiceCleared) return;
                     if (document.fullscreenElement) document.exitFullscreen(); 
                     
                     const isFromCreationFlow = stepHistory[stepHistory.length - 2] === 'FRIEND_SHARE';
@@ -1218,7 +1277,7 @@
                     } else {
                       setStep('HOME'); setStepHistory(['HOME']); setViewingWork(null); 
                     }
-                  }} className="absolute top-4 left-4 bg-red-500 text-white px-6 py-3 rounded-full font-bold z-10 shadow-lg hover:bg-red-600 animate-pulse border-2 border-white">
+                  }} className={`absolute top-4 left-4 text-white px-6 py-3 rounded-full font-bold z-10 shadow-lg border-2 border-white ${!slideVoiceCleared ? 'bg-gray-500 opacity-50 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600 animate-pulse'}`}>
                     ✖ 近くの友だちに スライドを見せた！
                   </button>
                 ) : (
@@ -1243,15 +1302,42 @@
                 
                 <div className="shrink-0 w-full bg-black px-4 py-4 md:py-6 flex flex-col items-center justify-center text-center border-t-2 border-gray-800">
                   <p className="text-white text-xl md:text-3xl font-bold font-note leading-tight">{sentence}</p>
+                  
+                  <div className="mt-4 h-[120px] flex flex-col items-center justify-center w-full">
+                    {!slideVoiceCleared ? (
+                      <div className="flex flex-col items-center">
+                        <div className="flex items-center justify-center gap-4">
+                          <button onClick={() => startSlideVoiceListening(sentence)} disabled={isSlideListening} className={`w-14 h-14 rounded-full text-2xl shadow-lg border-2 border-white ${isSlideListening ? 'bg-red-500 animate-pulse' : 'bg-teal-500 hover:bg-teal-600'} text-white transition flex items-center justify-center`}>🎤</button>
+                          {slideVoiceFailCount >= 1 && (
+                            <button onClick={() => setSlideVoiceCleared(true)} className="text-sm bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-full transition shadow border border-gray-500">⏭️ スキップ</button>
+                          )}
+                        </div>
+                        <p className="text-gray-400 text-sm mt-2 font-bold">{isSlideListening ? "はなしてね..." : "マイクをおして えいごを言うと、次へすすめるよ"}</p>
+                        {slideVoiceFeedback && <p className="mt-1 text-sm text-yellow-300 font-bold whitespace-pre-line">{slideVoiceFeedback}</p>}
+                      </div>
+                    ) : (
+                      <div className="text-green-400 font-bold text-2xl animate-bounce-in flex items-center gap-2">
+                        <span>✓</span> 言えた！次へすすもう！
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
             
             <div className="absolute inset-y-0 left-2 md:left-6 flex items-center z-40">
-               <button onClick={() => setCurrentSlideIndex(Math.max(0, currentSlideIndex - 1))} className={`text-white text-5xl md:text-7xl p-2 transition hover:scale-110 active:scale-95 drop-shadow-md ${currentSlideIndex === 0 ? 'invisible' : ''}`}>◀</button>
+               <button onClick={() => {
+                 setCurrentSlideIndex(Math.max(0, currentSlideIndex - 1));
+                 resetSlideVoice();
+               }} className={`text-white text-5xl md:text-7xl p-2 transition hover:scale-110 active:scale-95 drop-shadow-md ${currentSlideIndex === 0 ? 'invisible' : ''}`}>◀</button>
             </div>
             <div className="absolute inset-y-0 right-2 md:right-6 flex items-center z-40">
-               <button onClick={() => setCurrentSlideIndex(Math.min(workData.answers.length - 1, currentSlideIndex + 1))} className={`text-white text-5xl md:text-7xl p-2 transition hover:scale-110 active:scale-95 drop-shadow-md ${currentSlideIndex === workData.answers.length - 1 ? 'invisible' : ''}`}>▶</button>
+               <button onClick={() => {
+                 if(slideVoiceCleared) {
+                   setCurrentSlideIndex(Math.min(workData.answers.length - 1, currentSlideIndex + 1));
+                   resetSlideVoice();
+                 }
+               }} className={`text-white text-5xl md:text-7xl p-2 transition drop-shadow-md ${currentSlideIndex === workData.answers.length - 1 ? 'invisible' : ''} ${!slideVoiceCleared ? 'opacity-30 cursor-not-allowed' : 'hover:scale-110 active:scale-95'}`}>▶</button>
             </div>
 
             <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-red-100/90 text-red-800 font-bold px-6 py-3 rounded-2xl border-2 border-red-300 shadow-xl whitespace-nowrap z-50 animate-pulse text-sm md:text-base pointer-events-none">
